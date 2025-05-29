@@ -7,188 +7,209 @@ import {
   Button,
   Box,
   Typography,
-  Alert,
   LinearProgress,
-  Paper
+  Alert,
+  Chip,
+  Divider
 } from '@mui/material';
-import { 
-  CloudUpload as UploadIcon,
-  Image as ImageIcon,
-  Close as CloseIcon 
-} from '@mui/icons-material';
-import { uploadTestImage } from '../services/imageTestService';
+import { uploadTestImage, testBackendConnection, testFirebaseConnection } from '../services/imageTestService';
 
-interface Props {
+interface ImageTestDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
-export default function ImageTestDialog({ open, onClose }: Props) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+const ImageTestDialog: React.FC<ImageTestDialogProps> = ({ open, onClose }) => {
   const [uploading, setUploading] = useState(false);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
+  const [firebaseStatus, setFirebaseStatus] = useState<boolean | null>(null);
+  const [testing, setTesting] = useState(false);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        setSelectedFile(file);
-        setError(null);
-        setUploadedImageUrl(null);
-        setSuccess(null);
-      } else {
-        setError('Моля, изберете изображение (JPG, PNG, GIF, etc.)');
-        setSelectedFile(null);
+  const testConnections = async () => {
+    setTesting(true);
+    setError(null);
+    
+    try {
+      console.log('🔍 Testing backend connection...');
+      const backendOk = await testBackendConnection();
+      setBackendStatus(backendOk);
+      
+      if (backendOk) {
+        console.log('🔍 Testing Firebase connection via backend...');
+        const firebaseOk = await testFirebaseConnection();
+        setFirebaseStatus(firebaseOk);
       }
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      setError('Connection test failed');
+      setBackendStatus(false);
+      setFirebaseStatus(false);
+    } finally {
+      setTesting(false);
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setError('Моля, изберете файл за качване');
-      return;
-    }
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    setResult(null);
 
     try {
-      setUploading(true);
-      setError(null);
-      setSuccess(null);
-
-      console.log('🚀 Starting upload process...');
-      
-      const downloadUrl = await uploadTestImage(selectedFile);
-      
-      console.log('🎉 Upload successful! URL:', downloadUrl);
-      
-      setUploadedImageUrl(downloadUrl);
-      setSuccess(`Снимката е качена успешно! Размер: ${(selectedFile.size / 1024).toFixed(1)} KB`);
-      
-    } catch (error: any) {
-      console.error('❌ Upload failed:', error);
-      setError(`Грешка при качване: ${error.message || 'Неизвестна грешка'}`);
+      console.log('📤 Starting upload test...');
+      const imageUrl = await uploadTestImage(file);
+      setResult(imageUrl);
+      console.log('✅ Upload test successful!');
+    } catch (error) {
+      console.error('❌ Upload test failed:', error);
+      setError(error instanceof Error ? error.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
   };
 
   const handleClose = () => {
-    setSelectedFile(null);
-    setUploadedImageUrl(null);
+    setResult(null);
     setError(null);
-    setSuccess(null);
-    setUploading(false);
+    setBackendStatus(null);
+    setFirebaseStatus(null);
     onClose();
   };
 
+  const getStatusColor = (status: boolean | null) => {
+    if (status === null) return 'default';
+    return status ? 'success' : 'error';
+  };
+
+  const getStatusText = (status: boolean | null) => {
+    if (status === null) return 'Not tested';
+    return status ? 'Connected' : 'Failed';
+  };
+
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ImageIcon />
-          Тест за качване на снимка
-        </Box>
+        🧪 Тест на качване на снимки
       </DialogTitle>
       
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Статус на връзките:
+          </Typography>
           
-          {/* File Input */}
-          <Paper sx={{ p: 2, border: '2px dashed #ccc', textAlign: 'center' }}>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              id="image-upload-test"
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
+            <Chip 
+              label={`Backend: ${getStatusText(backendStatus)}`}
+              color={getStatusColor(backendStatus)}
+              variant="outlined"
             />
-            <label htmlFor="image-upload-test">
-              <Button
-                variant="outlined"
-                component="span"
-                startIcon={<UploadIcon />}
-                sx={{ mb: 1 }}
-              >
-                Избери снимка
-              </Button>
-            </label>
-            
-            {selectedFile && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Избран файл: {selectedFile.name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Размер: {(selectedFile.size / 1024).toFixed(1)} KB
-                </Typography>
-              </Box>
-            )}
-          </Paper>
+            <Chip 
+              label={`Firebase: ${getStatusText(firebaseStatus)}`}
+              color={getStatusColor(firebaseStatus)}
+              variant="outlined"
+            />
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={testConnections}
+              disabled={testing}
+            >
+              {testing ? 'Тествам...' : 'Тест връзки'}
+            </Button>
+          </Box>
 
-          {/* Upload Progress */}
+          {testing && <LinearProgress sx={{ mb: 2 }} />}
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Тест на качване:
+          </Typography>
+          
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{ marginBottom: '1rem' }}
+            disabled={uploading}
+          />
+          
           {uploading && (
-            <Box>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                Качване на снимката...
-              </Typography>
+            <Box sx={{ mb: 2 }}>
               <LinearProgress />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Качвам снимка...
+              </Typography>
             </Box>
           )}
+        </Box>
 
-          {/* Error Message */}
-          {error && (
-            <Alert severity="error">
-              {error}
-            </Alert>
-          )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2">Грешка при качване:</Typography>
+            {error}
+          </Alert>
+        )}
 
-          {/* Success Message */}
-          {success && (
-            <Alert severity="success">
-              {success}
-            </Alert>
-          )}
-
-          {/* Uploaded Image Preview */}
-          {uploadedImageUrl && (
-            <Box>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                ✅ Качената снимка:
-              </Typography>
-              <Paper sx={{ p: 1 }}>
-                <img
-                  src={uploadedImageUrl}
-                  alt="Качена тест снимка"
-                  style={{
-                    width: '100%',
-                    maxHeight: '300px',
-                    objectFit: 'contain',
-                    borderRadius: '4px'
+        {result && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              ✅ Успешно качване!
+            </Typography>
+            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+              URL: {result}
+            </Typography>
+            
+            {result.startsWith('http') && (
+              <Box sx={{ mt: 2 }}>
+                <img 
+                  src={result} 
+                  alt="Uploaded test" 
+                  style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }}
+                  onError={(e) => {
+                    console.log('Image failed to load');
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
                   }}
                 />
-              </Paper>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                URL: {uploadedImageUrl}
+              </Box>
+            )}
+
+            {result.startsWith('firestore://') && (
+              <Typography variant="caption" color="text.secondary">
+                📄 Снимката е запазена в Firestore като fallback
               </Typography>
-            </Box>
-          )}
+            )}
+          </Alert>
+        )}
+
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+          <Typography variant="subtitle2" gutterBottom>
+            📋 Информация за тестване:
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            • Първо се тества Backend сървъра на localhost:3001<br/>
+            • Ако Backend работи, се тества Firebase Admin SDK<br/>
+            • При качване се опитва Firebase Storage → Firestore fallback<br/>
+            • Firestore fallback запазва base64 данни
+          </Typography>
         </Box>
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose} startIcon={<CloseIcon />}>
+        <Button onClick={handleClose}>
           Затвори
-        </Button>
-        <Button 
-          onClick={handleUpload} 
-          variant="contained" 
-          disabled={!selectedFile || uploading}
-          startIcon={<UploadIcon />}
-        >
-          {uploading ? 'Качва...' : 'Изпрати'}
         </Button>
       </DialogActions>
     </Dialog>
   );
-} 
+};
+
+export default ImageTestDialog; 
