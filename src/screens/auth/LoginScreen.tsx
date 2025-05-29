@@ -5,22 +5,45 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { colors } from '../../constants/colors';
 import { signIn } from '../../services/firebaseAPI';
+import { AuthStackParamList } from '../../navigation/AuthStack';
+import CustomAlert from '../../components/CustomAlert';
 // import { signInWithEmailAndPassword } from 'firebase/auth';
 // import { auth } from '../../services/firebase';
 
-export default function LoginScreen() {
+type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
+
+interface Props {
+  navigation: LoginScreenNavigationProp;
+}
+
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Alert states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'info'>('info');
+
+  // Helper function to show custom alert
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Грешка', 'Моля, попълнете всички полета');
+      showAlert('Грешка', 'Моля, попълнете всички полета', 'error');
       return;
     }
   
@@ -28,7 +51,7 @@ export default function LoginScreen() {
   
     try {
       const userData = await signIn(email, password);
-      Alert.alert('Успех', 'Успешен вход!');
+      showAlert('Успех', 'Успешен вход!', 'success');
       // По-късно ще запазим userData.idToken
     } catch (error: any) {
       let message = 'Грешен имейл или парола';
@@ -41,51 +64,77 @@ export default function LoginScreen() {
         message = 'Невалиден имейл адрес';
       }
       
-      Alert.alert('Грешка', message);
+      showAlert('Грешка', message, 'error');
     }
   
     setLoading(false);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Добре дошли!</Text>
-      <Text style={styles.subtitle}>Влезте в профила си</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Имейл"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Парола"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.buttonDisabled]} 
-        onPress={handleLogin}
-        disabled={loading}
+    <>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        extraHeight={120}
+        extraScrollHeight={120}
+        keyboardOpeningTime={0}
+        resetScrollToCoords={{ x: 0, y: 0 }}
       >
-        {loading ? (
-          <ActivityIndicator color={colors.textOnPrimary} />
-        ) : (
-          <Text style={styles.buttonText}>Вход</Text>
-        )}
-      </TouchableOpacity>
+        <Text style={styles.title}>Добре дошли!</Text>
+        <Text style={styles.subtitle}>Влезте в профила си</Text>
 
-      <TouchableOpacity style={styles.linkButton}>
-        <Text style={styles.linkText}>Нямате профил?</Text>
-        <TouchableOpacity style={styles.registerButton}>
-          <Text style={styles.registerButtonText}>Регистрирайте се</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Имейл"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Парола"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, loading && styles.buttonDisabled]} 
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.textOnPrimary} />
+          ) : (
+            <Text style={styles.buttonText}>Вход</Text>
+          )}
         </TouchableOpacity>
-      </TouchableOpacity>
-    </View>
+
+        <TouchableOpacity style={styles.linkButton}>
+          <Text style={styles.linkText}>Нямате профил?</Text>
+          <TouchableOpacity 
+            style={styles.registerButton}
+            onPress={() => navigation.navigate('Register')}
+          >
+            <Text style={styles.registerButtonText}>Регистрирайте се</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </KeyboardAwareScrollView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
+    </>
   );
 }
 
@@ -93,8 +142,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  contentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
   title: {
     fontSize: 32,

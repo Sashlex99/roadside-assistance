@@ -1,14 +1,16 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import LoginScreen from './src/screens/auth/LoginScreen';
+import { NavigationContainer } from '@react-navigation/native';
+import AuthStack from './src/navigation/AuthStack';
 import { colors } from './src/constants/colors';
-
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <LoginScreen />
-    </SafeAreaView>
+    <NavigationContainer>
+      <SafeAreaView style={styles.container}>
+        <AuthStack />
+      </SafeAreaView>
+    </NavigationContainer>
   );
 }
 

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "dev": true,
+    "minify": false,
+    "updates": {
+      "enabled": false
+    },
+    "developer": {
+      "tool": "expo-cli"
+    }
+  }
+} 
